@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full bg-zinc-50 text-zinc-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertitore P7M in PDF</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2pdf.js for client-side HTML to PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        /* Custom scrollbar for minimalist look */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e4e4e7;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #d4d4d8;
+        }
+        /* Print rules for perfect PDF export structure */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-full flex flex-col">
+
+    <!-- Header minimale -->
+    <header class="border-b border-zinc-100 bg-white/80 backdrop-blur sticky top-0 z-30 no-print">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="p-1.5 bg-zinc-900 text-white rounded">
+                    <i data-lucide="file-check" class="w-5 h-5"></i>
+                </div>
+                <span class="font-semibold tracking-tight">P7M <span class="text-zinc-400 font-normal">→</span> PDF</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="loadDemo()" class="text-xs font-medium text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded transition">
+                    Carica file demo
+                </button>
+                <a href="https://github.com" target="_blank" class="text-zinc-400 hover:text-zinc-900 transition">
+                    <i data-lucide="github" class="w-4 h-4"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl w-full mx-auto px-4 py-8 flex flex-col justify-center">
+        <!-- Area di feedback e notifiche -->
+        <div id="notification-area" class="mb-4 hidden no-print"></div>
+
+        <!-- Vista 1: Caricamento File (Stato Iniziale) -->
+        <section id="upload-section" class="w-full max-w-xl mx-auto py-8 no-print">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold tracking-tight text-zinc-900">Estrai e Converti file .p7m</h1>
+                <p class="text-zinc-500 text-sm mt-2">Trascina un file firmato digitalmente o caricalo dal tuo dispositivo.<br>La conversione avviene in locale sul tuo browser nel rispetto della privacy.</p>
+            </div>
+
+            <!-- Box di Drop -->
+            <div id="drop-zone" class="border-2 border-dashed border-zinc-200 hover:border-zinc-400 rounded-2xl bg-white p-12 text-center transition cursor-pointer flex flex-col items-center justify-center min-h-[260px]">
+                <input type="file" id="file-input" accept=".p7m" class="hidden" />
+                <div class="p-4 bg-zinc-50 rounded-full text-zinc-400 mb-4 transition-transform group-hover:scale-105">
+                    <i data-lucide="file-up" class="w-8 h-8"></i>
+                </div>
+                <h3 class="font-medium text-zinc-800 text-sm">Trascina qui il tuo file .p7m</h3>
+                <p class="text-xs text-zinc-400 mt-1">Oppure clicca per sfogliare i file</p>
+                <span class="mt-4 px-3 py-1 bg-zinc-100 rounded text-[11px] font-medium text-zinc-500">Supporta PDF o XML (Fatture)</span>
+            </div>
+        </section>
+
+        <!-- Vista 2: Caricamento / Processing State -->
+        <section id="processing-section" class="hidden text-center py-20 no-print">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-2 border-zinc-900 border-t-transparent mb-4"></div>
+            <h3 class="font-medium text-zinc-800 text-sm">Elaborazione e verifica firma...</h3>
+            <p class="text-xs text-zinc-400 mt-1">Stiamo estraendo il documento originale dal contenitore PKCS#7</p>
+        </section>
+
+        <!-- Vista 3: Risultato Estrazione PDF -->
+        <section id="pdf-result-section" class="hidden max-w-4xl mx-auto w-full no-print">
+            <div class="bg-white border border-zinc-100 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 bg-red-50 text-red-600 rounded-lg">
+                        <i data-lucide="file-text" class="w-8 h-8"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-zinc-900 text-lg" id="pdf-filename">documento.pdf</h2>
+                        <p class="text-xs text-zinc-500">File PDF estratto con successo dal p7m</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <button onclick="resetApp()" class="flex-1 md:flex-none px-4 py-2 text-sm font-medium border border-zinc-200 text-zinc-700 rounded-lg hover:bg-zinc-50 transition flex items-center justify-center gap-2">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i> Nuova Conversione
+                    </button>
+                    <a id="pdf-download-btn" href="#" download class="flex-1 md:flex-none px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-4 h-4"></i> Scarica PDF
+                    </a>
+                </div>
+            </div>
+
+            <!-- Frame di Anteprima PDF -->
+            <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden h-[600px] shadow-sm">
+                <iframe id="pdf-preview-iframe" class="w-full h-full border-0" src=""></iframe>
+            </div>
+        </section>
+
+        <!-- Vista 4: Risultato Estrazione XML (Fattura Elettronica) -->
+        <section id="xml-result-section" class="hidden w-full">
+            <div class="bg-white border border-zinc-100 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 no-print">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-lg">
+                        <i data-lucide="file-code" class="w-8 h-8"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-zinc-900 text-lg" id="xml-filename">fattura.xml</h2>
+                        <p class="text-xs text-zinc-500">Fattura elettronica individuata ed estratta dal p7m</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <button onclick="resetApp()" class="flex-1 md:flex-none px-4 py-2 text-sm font-medium border border-zinc-200 text-zinc-700 rounded-lg hover:bg-zinc-50 transition flex items-center justify-center gap-2">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i> Nuovo
+                    </button>
+                    <button onclick="downloadRawXml()" class="flex-1 md:flex-none px-4 py-2 text-sm font-medium border border-zinc-200 text-zinc-700 rounded-lg hover:bg-zinc-50 transition flex items-center justify-center gap-2" title="Scarica il file XML grezzo">
+                        <i data-lucide="code" class="w-4 h-4"></i> Scarica XML
+                    </button>
+                    <button onclick="exportXmlToPdf()" class="flex-1 md:flex-none px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition flex items-center justify-center gap-2">
+                        <i data-lucide="file-down" class="w-4 h-4"></i> Salva come PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenitore stampabile ed esportabile in PDF -->
+            <div class="bg-white border border-zinc-200 md:rounded-2xl shadow-sm p-6 md:p-12 max-w-4xl mx-auto" id="invoice-render-area">
+                <!-- Intestazione del Documento Renderizzato -->
+                <div class="flex flex-col md:flex-row md:justify-between border-b border-zinc-200 pb-8 gap-4">
+                    <div>
+                        <span class="px-2.5 py-1 bg-zinc-100 text-zinc-700 rounded text-xs font-semibold uppercase tracking-wider" id="invoice-type-badge">Fattura Elettronica</span>
+                        <h2 class="text-3xl font-extrabold tracking-tight text-zinc-900 mt-3">Documento di Vendita</h2>
+                        <div class="grid grid-cols-2 gap-x-6 gap-y-1 mt-4 text-sm text-zinc-500">
+                            <div>Numero: <strong class="text-zinc-900" id="invoice-number">-</strong></div>
+                            <div>Data: <strong class="text-zinc-900" id="invoice-date">-</strong></div>
+                            <div>Valuta: <strong class="text-zinc-900" id="invoice-currency">EUR</strong></div>
+                        </div>
+                    </div>
+                    <div class="md:text-right flex flex-col justify-end">
+                        <span class="text-xs text-zinc-400 uppercase tracking-wider">Totale Documento</span>
+                        <span class="text-3xl font-black text-zinc-950 mt-1" id="invoice-grand-total">€ 0,00</span>
+                    </div>
+                </div>
+
+                <!-- Soggetti coinvolti (Griglia Cedente e Cessionario) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 py-8 border-b border-zinc-100">
+                    <!-- Fornitore (Cedente) -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Cedente / Fornitore</h4>
+                        <div class="bg-zinc-50 rounded-xl p-4 border border-zinc-100 h-full">
+                            <div class="font-bold text-zinc-900 text-base" id="cedente-title">-</div>
+                            <div class="text-sm text-zinc-600 mt-2 space-y-1">
+                                <p id="cedente-piva">P.IVA: -</p>
+                                <p id="cedente-cf" class="text-xs text-zinc-500">CF: -</p>
+                                <p id="cedente-address" class="mt-2 text-xs text-zinc-500">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cliente (Cessionario) -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Cessionario / Cliente</h4>
+                        <div class="bg-zinc-50 rounded-xl p-4 border border-zinc-100 h-full">
+                            <div class="font-bold text-zinc-900 text-base" id="cessionario-title">-</div>
+                            <div class="text-sm text-zinc-600 mt-2 space-y-1">
+                                <p id="cessionario-piva">P.IVA: -</p>
+                                <p id="cessionario-cf" class="text-xs text-zinc-500">CF: -</p>
+                                <p id="cessionario-address" class="mt-2 text-xs text-zinc-500">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dettaglio righe prodotti/servizi -->
+                <div class="py-8">
+                    <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Dettagli dei Beni e Servizi</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-zinc-600">
+                            <thead>
+                                <tr class="border-b border-zinc-200 text-zinc-400 text-xs uppercase font-medium">
+                                    <th class="py-3 px-2 w-10">#</th>
+                                    <th class="py-3 px-2">Descrizione</th>
+                                    <th class="py-3 px-2 text-right">Q.tà</th>
+                                    <th class="py-3 px-2 text-right">Prezzo Unitario</th>
+                                    <th class="py-3 px-2 text-right">Aliquota IVA</th>
+                                    <th class="py-3 px-2 text-right">Totale Linea</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoice-items-tbody">
+                                <!-- Righe inserite dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Sezione Riepilogo e Pagamento -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-zinc-200 mt-4">
+                    <!-- Dettagli Pagamento -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Modalità di Pagamento</h4>
+                        <div class="border border-zinc-100 rounded-xl p-4 bg-zinc-50/50 space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-zinc-500">Metodo:</span>
+                                <span class="font-semibold text-zinc-800" id="payment-method">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-zinc-500">Importo atteso:</span>
+                                <span class="font-semibold text-zinc-800" id="payment-amount">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-zinc-500">Scadenza:</span>
+                                <span class="font-semibold text-zinc-800" id="payment-due">-</span>
+                            </div>
+                            <div class="pt-2 border-t border-zinc-100">
+                                <span class="text-xs text-zinc-400 block mb-1">IBAN di accredito:</span>
+                                <span class="font-mono text-xs text-zinc-800 block break-all font-semibold" id="payment-iban">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Riepilogo Aliquote IVA e imponibili -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Riepilogo Imposte</h4>
+                        <div class="border border-zinc-100 rounded-xl p-4 bg-zinc-50/50 space-y-2 text-sm">
+                            <div id="iva-summary-rows" class="space-y-1">
+                                <!-- Inseriti dinamicamente -->
+                            </div>
+                            <div class="pt-2 border-t border-zinc-200 flex justify-between font-bold text-zinc-900 text-base">
+                                <span>Totale Dovuto</span>
+                                <span id="payment-total-calculated">€ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer di cortesia fattura -->
+                <div class="mt-12 pt-8 border-t border-zinc-100 text-center text-[10px] text-zinc-400">
+                    <p>Fattura XML decodificata con successo da un file .p7m firmato digitalmente.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer statico minimale -->
+    <footer class="border-t border-zinc-100 bg-white py-6 no-print">
+        <div class="max-w-5xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+            <p>&copy; 2026 Convertitore P7M. Elaborazione 100% locale ed anonima sul tuo browser.</p>
+            <div class="flex items-center gap-4">
+                <span>Versione 1.1</span>
+                <span class="w-1 h-1 rounded-full bg-zinc-200"></span>
+                <a href="#" class="hover:text-zinc-900 transition">Privacy policy locale</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script Logica Applicativa -->
+    <script>
+        // Stato dell'applicazione
+        let activeFile = {
+            type: null, // 'pdf' | 'xml' | 'text'
+            data: null, // Uint8Array
+            filename: '',
+            xmlString: '' // per visualizzare o convertire
+        };
+
+        // Dizionario tipi documento FatturaPA
+        const TIPO_DOC_MAP = {
+            'TD01': 'Fattura',
+            'TD02': 'Acconto/Anticipo su fattura',
+            'TD03': 'Acconto/Anticipo su parcella',
+            'TD04': 'Nota di Credito',
+            'TD05': 'Nota di Debito',
+            'TD06': 'Parcella',
+            'TD16': 'Integrazione reverse charge interno',
+            'TD17': 'Integrazione acquisto servizi estero',
+            'TD18': 'Integrazione acquisto beni intracomunitari',
+            'TD19': 'Integrazione acquisto beni ex art.17 c.2'
+        };
+
+        const MODALITA_PAG_MAP = {
+            'MP01': 'Contanti',
+            'MP02': 'Assegno',
+            'MP03': 'Assegno circolare',
+            'MP04': 'Contanti presso Tesoreria',
+            'MP05': 'Bonifico',
+            'MP06': 'Vaglia cambiario',
+            'MP08': 'Carta di pagamento',
+            'MP09': 'Rapporto interbancario diretto (RID)',
+            'MP12': 'Ricevuta bancaria (RIBA)',
+            'MP17': 'Domiciliazione postale',
+            'MP18': 'Bollettino postale',
+            'MP21': 'Prelievo da conto corrente'
+        };
+
+        // Inizializzazione Lucide
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            setupDragAndDrop();
+        });
+
+        // Configurazione drag and drop ed input file
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-zinc-900', 'bg-zinc-50/50');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-zinc-900', 'bg-zinc-50/50');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-zinc-900', 'bg-zinc-50/50');
+                if (e.dataTransfer.files.length > 0) {
+                    processFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    processFile(e.target.files[0]);
+                }
+            });
+        }
+
+        // Mostra avviso/alert custom temporaneo
+        function showNotification(message, type = 'info') {
+            const area = document.getElementById('notification-area');
+            const bgClass = type === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-zinc-900 text-white border-zinc-900';
+            const icon = type === 'error' ? 'alert-circle' : 'info';
+            
+            area.innerHTML = `
+                <div class="flex items-center gap-3 px-4 py-3 border rounded-xl shadow-sm text-sm ${bgClass}">
+                    <i data-lucide="${icon}" class="w-5 h-5 flex-shrink-0"></i>
+                    <p class="flex-grow">${message}</p>
+                </div>
+            `;
+            area.classList.remove('hidden');
+            lucide.createIcons();
+
+            setTimeout(() => {
+                area.classList.add('hidden');
+            }, 6000);
+        }
+
+        // Ripristina l'interfaccia allo stato iniziale
+        function resetApp() {
+            activeFile = { type: null, data: null, filename: '', xmlString: '' };
+            document.getElementById('upload-section').classList.remove('hidden');
+            document.getElementById('processing-section').classList.add('hidden');
+            document.getElementById('pdf-result-section').classList.add('hidden');
+            document.getElementById('xml-result-section').classList.add('hidden');
+            document.getElementById('file-input').value = '';
+            document.getElementById('pdf-preview-iframe').src = '';
+        }
+
+        // Avvia il caricamento del file e il parser
+        function processFile(file) {
+            if (!file.name.endsWith('.p7m')) {
+                showNotification("Per favore, carica un file valido con estensione .p7m", "error");
+                return;
+            }
+
+            document.getElementById('upload-section').classList.add('hidden');
+            document.getElementById('processing-section').classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const arrayBuffer = e.target.result;
+                    const result = extractP7M(arrayBuffer);
+                    
+                    if (result) {
+                        result.originalFilename = file.name;
+                        renderResult(result);
+                    } else {
+                        throw new Error("Impossibile estrarre dati validi dal file .p7m");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showNotification("Errore di decodifica: il file potrebbe essere corrotto o la firma non supportata.", "error");
+                    resetApp();
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Funzione core di estrazione dal formato p7m (ASN.1 DER/PEM)
+        function extractP7M(arrayBuffer) {
+            let uint8 = new Uint8Array(arrayBuffer);
+
+            // Verifica se è memorizzato come Base64/PEM
+            uint8 = ensureBinary(uint8);
+
+            // Fallback 1: Ricerca di file PDF incorporati con scostamento byte
+            const pdfStart = indexOfSequence(uint8, [0x25, 0x50, 0x44, 0x46, 0x2d]); // "%PDF-"
+            if (pdfStart !== -1) {
+                const pdfEnd = indexOfSequence(uint8, [0x25, 0x25, 0x45, 0x4f, 0x46], pdfStart); // "%%EOF"
+                if (pdfEnd !== -1) {
+                    return {
+                        type: 'pdf',
+                        data: uint8.subarray(pdfStart, pdfEnd + 5),
+                        suggestedExtension: '.pdf'
+                    };
+                }
+            }
+
+            // Fallback 2: Ricerca di file XML incorporati (come fatture elettroniche)
+            const xmlStart = findXmlStart(uint8);
+            if (xmlStart !== -1) {
+                const xmlEnd = findXmlEnd(uint8, xmlStart);
+                if (xmlEnd !== -1) {
+                    return {
+                        type: 'xml',
+                        data: uint8.subarray(xmlStart, xmlEnd),
+                        suggestedExtension: '.xml'
+                    };
+                }
+            }
+
+            // Tentativo 3: Parsing ASN.1 mirato a identificare l'OID 1.2.840.113549.1.7.1 (PKCS7 Data)
+            try {
+                const extracted = extractPayloadFromDer(uint8);
+                if (extracted) return extracted;
+            } catch (e) {
+                console.warn("L'analisi ASN.1 fallita, utilizzo dei fallback binari", e);
+            }
+
+            // Se nulla ha funzionato ma sembra testo
+            try {
+                const text = new TextDecoder('utf-8').decode(uint8);
+                if (text.includes('<?xml')) {
+                    return { type: 'xml', data: uint8, suggestedExtension: '.xml' };
+                }
+            } catch(e) {}
+
+            return null;
+        }
+
+        // Se il file p7m è in codifica Base64 (PEM), lo converte in binario raw
+        function ensureBinary(uint8) {
+            try {
+                const str = new TextDecoder('ascii').decode(uint8.subarray(0, 500)).trim();
+                // Verifica pattern PEM o Base64 privo di spazi complessi
+                if (str.startsWith('-----BEGIN') || /^[A-Za-z0-9+/=\s\r\n]+$/.test(str.substring(0, Math.min(str.length, 300)))) {
+                    let cleanB64 = str;
+                    if (str.startsWith('-----BEGIN')) {
+                        const fullStr = new TextDecoder('ascii').decode(uint8).trim();
+                        const lines = fullStr.split('\n');
+                        cleanB64 = lines.filter(line => !line.startsWith('-----')).join('');
+                    }
+                    cleanB64 = cleanB64.replace(/[\s\r\n]+/g, '');
+                    const binaryString = atob(cleanB64);
+                    const len = binaryString.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    return bytes;
+                }
+            } catch (e) {
+                // Non è un testo ASCII / Base64 valido, usa l'array binario di partenza
+            }
+            return uint8;
+        }
+
+        // Ricerca indice sequenza di byte
+        function indexOfSequence(source, target, startFrom = 0) {
+            for (let i = startFrom; i < source.length - target.length + 1; i++) {
+                let match = true;
+                for (let j = 0; j < target.length; j++) {
+                    if (source[i + j] !== target[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            return -1;
+        }
+
+        // Identifica l'inizio dell'XML ignorando gli header p7m
+        function findXmlStart(uint8) {
+            // Cerca "<?xml"
+            const xmlHeader = [0x3c, 0x3f, 0x78, 0x6d, 0x6c];
+            let idx = indexOfSequence(uint8, xmlHeader);
+            if (idx !== -1) return idx;
+
+            // Altrimenti cerca tag "<p:FatturaElettronica" o "<FatturaElettronica"
+            const tagRoot = [0x3c, 0x46, 0x61, 0x74, 0x74, 0x75, 0x72, 0x61]; // "<Fattura"
+            return indexOfSequence(uint8, tagRoot);
+        }
+
+        // Cerca l'indice finale dell'XML
+        function findXmlEnd(uint8, startIdx) {
+            // Cerca la chiusura dell'elemento radice "</"
+            // Tenta di decodificare la fine del file
+            const endIndicator = [0x3c, 0x2f]; // "</"
+            let current = uint8.length - 1;
+            while (current > startIdx) {
+                if (uint8[current] === 0x3e) { // ">"
+                    // Controlla se c'è "FatturaElettronica>" prima
+                    const textChunk = new TextDecoder('utf-8').decode(uint8.subarray(current - 40, current + 1));
+                    if (textChunk.toLowerCase().includes('fatturaelettronica>')) {
+                        return current + 1;
+                    }
+                }
+                current--;
+            }
+            return uint8.length;
+        }
+
+        // Parsing ASN.1 base per estrarre la porzione di dati
+        function extractPayloadFromDer(uint8) {
+            // OID per PKCS7 Data: 1.2.840.113549.1.7.1 in hex (06 09 2a 86 48 86 f7 0d 01 07 01)
+            const dataOid = [0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x01];
+            const oidIdx = indexOfSequence(uint8, dataOid);
+            if (oidIdx === -1) return null;
+
+            let pos = oidIdx + dataOid.length;
+            // Il tag successivo deve essere [0] EXPLICIT (0xA0)
+            if (uint8[pos] !== 0xa0) return null;
+            pos++;
+
+            // Leggi la lunghezza dell'elemento [0]
+            const lenObj = readDerLength(uint8, pos);
+            if (!lenObj) return null;
+            pos = lenObj.contentPos;
+
+            // Dentro 0xA0 dovrebbe esserci un OCTET STRING (0x04) o un constructed OCTET STRING (0x24)
+            const tag = uint8[pos];
+            if (tag === 0x04) {
+                pos++;
+                const dataLen = readDerLength(uint8, pos);
+                if (!dataLen) return null;
+                const innerData = uint8.subarray(dataLen.contentPos, dataLen.contentPos + dataLen.length);
+                return detectTypeAndWrap(innerData);
+            } else if (tag === 0x24) {
+                // Se frammentato in blocchi OCTET STRING multipli
+                pos++;
+                const dataLen = readDerLength(uint8, pos);
+                if (!dataLen) return null;
+                let end = dataLen.contentPos + dataLen.length;
+                let currentPos = dataLen.contentPos;
+                const chunks = [];
+                while (currentPos < end) {
+                    if (uint8[currentPos] === 0x04) {
+                        currentPos++;
+                        const chunkLen = readDerLength(uint8, currentPos);
+                        if (!chunkLen) break;
+                        chunks.push(uint8.subarray(chunkLen.contentPos, chunkLen.contentPos + chunkLen.length));
+                        currentPos = chunkLen.contentPos + chunkLen.length;
+                    } else {
+                        break;
+                    }
+                }
+                if (chunks.length > 0) {
+                    const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+                    const combined = new Uint8Array(totalLength);
+                    let offset = 0;
+                    for (const chunk of chunks) {
+                        combined.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    return detectTypeAndWrap(combined);
+                }
+            }
+            return null;
+        }
+
+        function readDerLength(uint8, pos) {
+            if (pos >= uint8.length) return null;
+            const initial = uint8[pos];
+            if ((initial & 0x80) === 0) {
+                return { length: initial, contentPos: pos + 1 };
+            } else {
+                const numBytes = initial & 0x7f;
+                let len = 0;
+                for (let i = 0; i < numBytes; i++) {
+                    len = (len << 8) | uint8[pos + 1 + i];
+                }
+                return { length: len, contentPos: pos + 1 + numBytes };
+            }
+        }
+
+        function detectTypeAndWrap(uint8) {
+            // Controlla se comincia come PDF
+            if (uint8[0] === 0x25 && uint8[1] === 0x50 && uint8[2] === 0x44 && uint8[3] === 0x46) {
+                return { type: 'pdf', data: uint8, suggestedExtension: '.pdf' };
+            }
+            // Controlla se è XML
+            try {
+                const text = new TextDecoder('utf-8').decode(uint8.subarray(0, Math.min(uint8.length, 500)));
+                if (text.includes('<?xml') || text.includes('<FatturaElettronica') || text.includes('<p:FatturaElettronica')) {
+                    return { type: 'xml', data: uint8, suggestedExtension: '.xml' };
+                }
+            } catch(e) {}
+
+            return { type: 'text', data: uint8, suggestedExtension: '.txt' };
+        }
+
+        // Rendering delle schermate di anteprima a seconda del tipo file
+        function renderResult(result) {
+            document.getElementById('processing-section').classList.add('hidden');
+
+            activeFile.type = result.type;
+            activeFile.data = result.data;
+            // Genera il nome ideale di output
+            const baseName = result.originalFilename.replace(/\.p7m$/i, '');
+            activeFile.filename = baseName.endsWith(result.suggestedExtension) ? baseName : baseName + result.suggestedExtension;
+
+            if (result.type === 'pdf') {
+                // Mostra pannello PDF
+                document.getElementById('pdf-result-section').classList.remove('hidden');
+                document.getElementById('pdf-filename').textContent = activeFile.filename;
+                
+                // Crea blob per l'anteprima
+                const blob = new Blob([result.data], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                
+                document.getElementById('pdf-preview-iframe').src = blobUrl;
+                document.getElementById('pdf-download-btn').href = blobUrl;
+                document.getElementById('pdf-download-btn').download = activeFile.filename;
+
+            } else if (result.type === 'xml') {
+                // Decodifica la stringa XML
+                const xmlString = new TextDecoder('utf-8').decode(result.data);
+                activeFile.xmlString = xmlString;
+
+                document.getElementById('xml-result-section').classList.remove('hidden');
+                document.getElementById('xml-filename').textContent = activeFile.filename;
+
+                renderXmlInvoice(xmlString);
+            } else {
+                // Altro file testuale
+                showNotification("Questo p7m contiene dati in formato testo o sconosciuto. Mostriamo l'anteprima testuale.", "info");
+                document.getElementById('xml-result-section').classList.remove('hidden');
+                document.getElementById('xml-filename').textContent = activeFile.filename;
+                
+                const rawText = new TextDecoder('utf-8').decode(result.data);
+                document.getElementById('invoice-render-area').innerHTML = `
+                    <pre class="bg-zinc-50 p-6 rounded-lg text-xs font-mono overflow-auto max-h-[500px] whitespace-pre-wrap">${escapeHtml(rawText)}</pre>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function escapeHtml(string) {
+            return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                    '/': '&#x2F;',
+                    '=': '&#x3D;'
+                }[s];
+            });
+        }
+
+        // Visualizzazione di una Fattura Elettronica strutturata
+        function renderXmlInvoice(xmlString) {
+            try {
+                const doc = parseFatturaXML(xmlString);
+                
+                // Popolamento Header
+                const tipoDocLabel = TIPO_DOC_MAP[doc.header.tipoDocumento] || 'Fattura Elettronica';
+                document.getElementById('invoice-type-badge').textContent = tipoDocLabel;
+                document.getElementById('invoice-number').textContent = doc.header.numero || '-';
+                document.getElementById('invoice-date').textContent = formatDate(doc.header.data);
+                document.getElementById('invoice-currency').textContent = doc.header.divisa || 'EUR';
+
+                // Format Valuta
+                const formatCurrency = (val) => {
+                    const num = parseFloat(val);
+                    if (isNaN(num)) return '€ 0,00';
+                    return new Intl.NumberFormat('it-IT', { style: 'currency', currency: doc.header.divisa || 'EUR' }).format(num);
+                };
+
+                const grandTotal = doc.header.importoTotale ? formatCurrency(doc.header.importoTotale) : formatCurrency(calculateCalculatedTotal(doc));
+                document.getElementById('invoice-grand-total').textContent = grandTotal;
+
+                // Fornitore (Cedente)
+                const cTitle = doc.cedente.denominazione || `${doc.cedente.nome} ${doc.cedente.cognome}`.trim();
+                document.getElementById('cedente-title').textContent = cTitle || 'Sconosciuto';
+                document.getElementById('cedente-piva').textContent = doc.cedente.piva ? `P.IVA: ${doc.cedente.piva}` : 'P.IVA non presente';
+                document.getElementById('cedente-cf').textContent = doc.cedente.cf ? `Codice Fiscale: ${doc.cedente.cf}` : '';
+                document.getElementById('cedente-address').textContent = `${doc.cedente.indirizzo || ''}, ${doc.cedente.cap || ''} ${doc.cedente.comune || ''} (${doc.cedente.provincia || ''}) ${doc.cedente.nazione || ''}`;
+
+                // Cliente (Cessionario)
+                const cesTitle = doc.cessionario.denominazione || `${doc.cessionario.nome} ${doc.cessionario.cognome}`.trim();
+                document.getElementById('cessionario-title').textContent = cesTitle || 'Sconosciuto';
+                document.getElementById('cessionario-piva').textContent = doc.cessionario.piva ? `P.IVA: ${doc.cessionario.piva}` : 'P.IVA non presente';
+                document.getElementById('cessionario-cf').textContent = doc.cessionario.cf ? `Codice Fiscale: ${doc.cessionario.cf}` : '';
+                document.getElementById('cessionario-address').textContent = `${doc.cessionario.indirizzo || ''}, ${doc.cessionario.cap || ''} ${doc.cessionario.comune || ''} (${doc.cessionario.provincia || ''}) ${doc.cessionario.nazione || ''}`;
+
+                // Popolamento Righe Prodotto/Servizi
+                const tbody = document.getElementById('invoice-items-tbody');
+                tbody.innerHTML = '';
+                
+                if (doc.righe.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-zinc-400">Nessuna riga di dettaglio trovata</td></tr>`;
+                } else {
+                    doc.righe.forEach((riga, i) => {
+                        const tr = document.createElement('tr');
+                        tr.className = "border-b border-zinc-100 hover:bg-zinc-50/50";
+                        tr.innerHTML = `
+                            <td class="py-3 px-2 text-zinc-400 text-xs">${riga.numero || (i + 1)}</td>
+                            <td class="py-3 px-2 font-medium text-zinc-900">
+                                ${escapeHtml(riga.descrizione)}
+                            </td>
+                            <td class="py-3 px-2 text-right">${riga.quantita ? parseFloat(riga.quantita).toLocaleString('it-IT') : '1'}</td>
+                            <td class="py-3 px-2 text-right">${formatCurrency(riga.prezzoUnitario)}</td>
+                            <td class="py-3 px-2 text-right text-xs text-zinc-500">${riga.aliquota ? parseFloat(riga.aliquota) + '%' : '-'}</td>
+                            <td class="py-3 px-2 text-right font-semibold text-zinc-800">${formatCurrency(riga.prezzoTotale)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                // Dati di pagamento
+                const pMethodLabel = MODALITA_PAG_MAP[doc.pagamento.modalita] || doc.pagamento.modalita || 'Bonifico o altro';
+                document.getElementById('payment-method').textContent = pMethodLabel;
+                document.getElementById('payment-amount').textContent = doc.pagamento.importo ? formatCurrency(doc.pagamento.importo) : grandTotal;
+                document.getElementById('payment-due').textContent = doc.pagamento.scadenza ? formatDate(doc.pagamento.scadenza) : 'Come concordato';
+                document.getElementById('payment-iban').textContent = doc.pagamento.iban ? formatIban(doc.pagamento.iban) : 'Non indicato in fattura';
+
+                // Riepilogo Aliquote e Tasse
+                const riepilogoDiv = document.getElementById('iva-summary-rows');
+                riepilogoDiv.innerHTML = '';
+                let totalTaxable = 0;
+                let totalTax = 0;
+
+                doc.riepilogo.forEach(r => {
+                    const impo = parseFloat(r.imponibile) || 0;
+                    const imposta = parseFloat(r.imposta) || 0;
+                    totalTaxable += impo;
+                    totalTax += imposta;
+
+                    const row = document.createElement('div');
+                    row.className = "flex justify-between text-xs text-zinc-500";
+                    row.innerHTML = `
+                        <span>Imponibile IVA ${r.aliquota}% (${formatCurrency(impo)})</span>
+                        <span>Imposta: ${formatCurrency(imposta)}</span>
+                    `;
+                    riepilogoDiv.appendChild(row);
+                });
+
+                if (doc.riepilogo.length === 0) {
+                    riepilogoDiv.innerHTML = `<div class="text-zinc-400 text-xs text-center py-2">Dati riepilogo imposte non indicati</div>`;
+                }
+
+                // Totale Calcolato
+                const computedTotal = totalTaxable + totalTax;
+                document.getElementById('payment-total-calculated').textContent = formatCurrency(computedTotal);
+
+            } catch (err) {
+                console.error("Errore durante il rendering HTML dell'XML", err);
+                showNotification("Impossibile formattare la fattura graficamente. Puoi scaricare l'XML originale.", "error");
+            }
+        }
+
+        // Parser XML personalizzato per supportare al meglio i namespace della fattura elettronica italiana
+        function parseFatturaXML(xmlString) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+
+            // Utility per cercare nodi in modo agnostico rispetto ai namespace (p: o sdi:)
+            function getEl(parent, tagName) {
+                if (!parent) return null;
+                let el = parent.querySelector(tagName);
+                if (!el) {
+                    const tagLower = tagName.toLowerCase();
+                    const all = parent.querySelectorAll('*');
+                    for (const item of all) {
+                        const localName = item.localName || item.tagName.split(':').pop();
+                        if (localName.toLowerCase() === tagLower) {
+                            return item;
+                        }
+                    }
+                }
+                return el;
+            }
+
+            function getElText(parent, tagName) {
+                const el = getEl(parent, tagName);
+                return el ? el.textContent.trim() : '';
+            }
+
+            function getEls(parent, tagName) {
+                if (!parent) return [];
+                let els = parent.querySelectorAll(tagName);
+                if (els.length === 0) {
+                    const tagLower = tagName.toLowerCase();
+                    const all = parent.querySelectorAll('*');
+                    const matched = [];
+                    for (const item of all) {
+                        const localName = item.localName || item.tagName.split(':').pop();
+                        if (localName.toLowerCase() === tagLower) {
+                            matched.push(item);
+                        }
+                    }
+                    return matched;
+                }
+                return Array.from(els);
+            }
+
+            const data = {
+                header: {
+                    tipoDocumento: '',
+                    divisa: 'EUR',
+                    data: '',
+                    numero: '',
+                    importoTotale: ''
+                },
+                cedente: { denominazione: '', nome: '', cognome: '', piva: '', cf: '', indirizzo: '', cap: '', comune: '', provincia: '', nazione: '' },
+                cessionario: { denominazione: '', nome: '', cognome: '', piva: '', cf: '', indirizzo: '', cap: '', comune: '', provincia: '', nazione: '' },
+                righe: [],
+                riepilogo: [],
+                pagamento: { modalita: '', iban: '', scadenza: '', importo: '' }
+            };
+
+            // Cedente (Fornitore)
+            const cedenteNode = getEl(xmlDoc, 'CedentePrestatore');
+            if (cedenteNode) {
+                const anagrafica = getEl(cedenteNode, 'Anagrafica');
+                if (anagrafica) {
+                    data.cedente.denominazione = getElText(anagrafica, 'Denominazione');
+                    data.cedente.nome = getElText(anagrafica, 'Nome');
+                    data.cedente.cognome = getElText(anagrafica, 'Cognome');
+                }
+                const idFiscale = getEl(cedenteNode, 'IdFiscaleIVA');
+                if (idFiscale) {
+                    data.cedente.piva = getElText(idFiscale, 'IdCodice');
+                }
+                data.cedente.cf = getElText(cedenteNode, 'CodiceFiscale');
+
+                const sede = getEl(cedenteNode, 'Sede');
+                if (sede) {
+                    data.cedente.indirizzo = getElText(sede, 'Indirizzo');
+                    data.cedente.cap = getElText(sede, 'CAP');
+                    data.cedente.comune = getElText(sede, 'Comune');
+                    data.cedente.provincia = getElText(sede, 'Provincia');
+                    data.cedente.nazione = getElText(sede, 'Nazione') || 'IT';
+                }
+            }
+
+            // Cessionario (Cliente)
+            const cessionarioNode = getEl(xmlDoc, 'CessionarioCommittente');
+            if (cessionarioNode) {
+                const anagrafica = getEl(cessionarioNode, 'Anagrafica');
+                if (anagrafica) {
+                    data.cessionario.denominazione = getElText(anagrafica, 'Denominazione');
+                    data.cessionario.nome = getElText(anagrafica, 'Nome');
+                    data.cessionario.cognome = getElText(anagrafica, 'Cognome');
+                }
+                const idFiscale = getEl(cessionarioNode, 'IdFiscaleIVA');
+                if (idFiscale) {
+                    data.cessionario.piva = getElText(idFiscale, 'IdCodice');
+                }
+                data.cessionario.cf = getElText(cessionarioNode, 'CodiceFiscale');
+
+                const sede = getEl(cessionarioNode, 'Sede');
+                if (sede) {
+                    data.cessionario.indirizzo = getElText(sede, 'Indirizzo');
+                    data.cessionario.cap = getElText(sede, 'CAP');
+                    data.cessionario.comune = getElText(sede, 'Comune');
+                    data.cessionario.provincia = getElText(sede, 'Provincia');
+                    data.cessionario.nazione = getElText(sede, 'Nazione') || 'IT';
+                }
+            }
+
+            // Dati Generali Documento
+            const datiGenerali = getEl(xmlDoc, 'DatiGeneraliDocumento');
+            if (datiGenerali) {
+                data.header.tipoDocumento = getElText(datiGenerali, 'TipoDocumento');
+                data.header.divisa = getElText(datiGenerali, 'Divisa') || 'EUR';
+                data.header.data = getElText(datiGenerali, 'Data');
+                data.header.numero = getElText(datiGenerali, 'Numero');
+                data.header.importoTotale = getElText(datiGenerali, 'ImportoTotaleDocumento');
+            }
+
+            // Righe di dettaglio (Prodotti / Servizi)
+            const linee = getEls(xmlDoc, 'DettaglioLinee');
+            linee.forEach(linea => {
+                data.righe.push({
+                    numero: getElText(linea, 'NumeroLinea'),
+                    descrizione: getElText(linea, 'Descrizione'),
+                    quantita: getElText(linea, 'Quantita'),
+                    prezzoUnitario: getElText(linea, 'PrezzoUnitario'),
+                    prezzoTotale: getElText(linea, 'PrezzoTotale'),
+                    aliquota: getElText(linea, 'AliquotaIVA')
+                });
+            });
+
+            // Riepilogo Aliquote IVA
+            const riepiloghi = getEls(xmlDoc, 'DatiRiepilogo');
+            riepiloghi.forEach(r => {
+                data.riepilogo.push({
+                    aliquota: getElText(r, 'AliquotaIVA'),
+                    imponibile: getElText(r, 'ImponibileImporto'),
+                    imposta: getElText(r, 'Imposta')
+                });
+            });
+
+            // Dettaglio Pagamento
+            const pagamentoNode = getEl(xmlDoc, 'DettaglioPagamento');
+            if (pagamentoNode) {
+                data.pagamento.modalita = getElText(pagamentoNode, 'ModalitaPagamento');
+                data.pagamento.iban = getElText(pagamentoNode, 'IBAN');
+                data.pagamento.scadenza = getElText(pagamentoNode, 'DataScadenzaPagamento');
+                data.pagamento.importo = getElText(pagamentoNode, 'ImportoPagamento');
+            }
+
+            return data;
+        }
+
+        // Calcola la somma aritmetica qualora mancasse il Totale Generale indicizzato
+        function calculateCalculatedTotal(doc) {
+            let total = 0;
+            doc.riepilogo.forEach(r => {
+                const imponibile = parseFloat(r.imponibile) || 0;
+                const imposta = parseFloat(r.imposta) || 0;
+                total += imponibile + imposta;
+            });
+            return total || doc.righe.reduce((acc, curr) => acc + (parseFloat(curr.prezzoTotale) || 0), 0);
+        }
+
+        // Formatta date da YYYY-MM-DD a DD/MM/YYYY
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const pts = dateStr.split('-');
+            if (pts.length === 3) {
+                return `${pts[2]}/${pts[1]}/${pts[0]}`;
+            }
+            return dateStr;
+        }
+
+        // Formatta l'IBAN a blocchi di 4 caratteri per leggibilità
+        function formatIban(iban) {
+            if (!iban) return '';
+            const cleaned = iban.replace(/\s+/g, '').toUpperCase();
+            const blocks = [];
+            for (let i = 0; i < cleaned.length; i += 4) {
+                blocks.push(cleaned.slice(i, i + 4));
+            }
+            return blocks.join(' ');
+        }
+
+        // Esportazione del rendering XML in PDF tramite html2pdf.js
+        function exportXmlToPdf() {
+            const element = document.getElementById('invoice-render-area');
+            const pdfFilename = activeFile.filename.replace(/\.xml$/i, '.pdf');
+            
+            // Impostazioni per html2pdf
+            const opt = {
+                margin:       10,
+                filename:     pdfFilename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Esegui ed esporta
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // Consente il download alternativo del solo file XML originario
+        function downloadRawXml() {
+            if (!activeFile.xmlString) return;
+            const blob = new Blob([activeFile.xmlString], { type: 'application/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = activeFile.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Funzione per caricare una fattura fittizia e mostrare all'utente l'interfaccia
+        function loadDemo() {
+            document.getElementById('upload-section').classList.add('hidden');
+            document.getElementById('processing-section').classList.remove('hidden');
+
+            setTimeout(() => {
+                const mockXml = `<?xml version="1.0" encoding="UTF-8"?>
+                <p:FatturaElettronica versione="FPR12" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <FatturaElettronicaHeader>
+                        <CedentePrestatore>
+                            <Anagrafica>
+                                <Denominazione>Azienda Agricola Rossi S.r.l.</Denominazione>
+                            </Anagrafica>
+                            <IdFiscaleIVA>
+                                <IdCodice>IT01234567890</IdCodice>
+                            </IdFiscaleIVA>
+                            <CodiceFiscale>01234567890</CodiceFiscale>
+                            <Sede>
+                                <Indirizzo>Via dei Vigneti, 12</Indirizzo>
+                                <CAP>10100</CAP>
+                                <Comune>Torino</Comune>
+                                <Provincia>TO</Provincia>
+                                <Nazione>IT</Nazione>
+                            </Sede>
+                        </CedentePrestatore>
+                        <CessionarioCommittente>
+                            <Anagrafica>
+                                <Denominazione>Ristorante Bella Italia S.p.A.</Denominazione>
+                            </Anagrafica>
+                            <IdFiscaleIVA>
+                                <IdCodice>IT09876543210</IdCodice>
+                            </IdFiscaleIVA>
+                            <CodiceFiscale>09876543210</CodiceFiscale>
+                            <Sede>
+                                <Indirizzo>Piazza Duomo, 5</Indirizzo>
+                                <CAP>20121</CAP>
+                                <Comune>Milano</Comune>
+                                <Provincia>MI</Provincia>
+                                <Nazione>IT</Nazione>
+                            </Sede>
+                        </CessionarioCommittente>
+                    </FatturaElettronicaHeader>
+                    <FatturaElettronicaBody>
+                        <DatiGenerali>
+                            <DatiGeneraliDocumento>
+                                <TipoDocumento>TD01</TipoDocumento>
+                                <Divisa>EUR</Divisa>
+                                <Data>2026-05-15</Data>
+                                <Numero>FATT-2026-88</Numero>
+                                <ImportoTotaleDocumento>1549.40</ImportoTotaleDocumento>
+                            </DatiGeneraliDocumento>
+                        </DatiGenerali>
+                        <DatiBeniServizi>
+                            <DettaglioLinee>
+                                <NumeroLinea>1</NumeroLinea>
+                                <Descrizione>Fornitura Olio Extravergine di Oliva d'eccellenza - Campagna 2025</Descrizione>
+                                <Quantita>100.00</Quantita>
+                                <PrezzoUnitario>11.00</PrezzoUnitario>
+                                <PrezzoTotale>1100.00</PrezzoTotale>
+                                <AliquotaIVA>10.00</AliquotaIVA>
+                            </DettaglioLinee>
+                            <DettaglioLinee>
+                                <NumeroLinea>2</NumeroLinea>
+                                <Descrizione>Selezione Vini Rossi D.O.C. Riserva della Casa</Descrizione>
+                                <Quantita>24.00</Quantita>
+                                <PrezzoUnitario>15.00</PrezzoUnitario>
+                                <PrezzoTotale>360.00</PrezzoTotale>
+                                <AliquotaIVA>22.00</AliquotaIVA>
+                            </DettaglioLinee>
+                            <DatiRiepilogo>
+                                <AliquotaIVA>10.00</AliquotaIVA>
+                                <ImponibileImporto>1100.00</ImponibileImporto>
+                                <Imposta>110.00</Imposta>
+                            </DatiRiepilogo>
+                            <DatiRiepilogo>
+                                <AliquotaIVA>22.00</AliquotaIVA>
+                                <ImponibileImporto>360.00</ImponibileImporto>
+                                <Imposta>79.20</Imposta>
+                            </DatiRiepilogo>
+                        </DatiBeniServizi>
+                        <DatiPagamento>
+                            <DettaglioPagamento>
+                                <ModalitaPagamento>MP05</ModalitaPagamento>
+                                <DataScadenzaPagamento>2026-06-15</DataScadenzaPagamento>
+                                <ImportoPagamento>1549.40</ImportoPagamento>
+                                <IBAN>IT60X0542801234000000123456</IBAN>
+                            </DettaglioPagamento>
+                        </DatiPagamento>
+                    </FatturaElettronicaBody>
+                </p:FatturaElettronica>`;
+
+                const mockData = new TextEncoder('utf-8').encode(mockXml);
+                renderResult({
+                    type: 'xml',
+                    data: mockData,
+                    suggestedExtension: '.xml',
+                    originalFilename: 'fattura_esempio_rossi.xml.p7m'
+                });
+
+                showNotification("Caricata fattura dimostrativa. Prova a cliccare su 'Salva come PDF'.", "info");
+            }, 800);
+        }
+    </script>
+</body>
+</html>
